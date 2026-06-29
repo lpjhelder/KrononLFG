@@ -1,5 +1,34 @@
 # KrononLFG — Changelog
 
+## 0.2.0
+
+**Português**
+
+- **Painel ancorado no Localizador nativo:** o KrononLFG agora "gruda" no finder de Grupos Prontos do jogo, com a nossa cara (navy/dourado + logo), em vez de só uma janela à parte. **Arraste** pra onde quiser — a posição é lembrada.
+- **Filtro de masmorra instantâneo:** marque/desmarque masmorras no painel e a lista nativa filtra na hora (client-side, sem re-buscar — sem travas nem entradas delistadas).
+- **Drops por masmorra no ilvl da chave:** cada masmorra mostra os itens que dropam; passe a seta e o item aparece **no ilvl do nível de chave selecionado** (escala de verdade; +11 ou mais usa o teto do +10).
+- **Filtro automático pela sua classe:** os drops já vêm só da classe do personagem logado.
+- **Destaque dos favoritos do KeystoneLoot:** itens marcados ganham borda colorida — **BiS**, **Essencial**, **Bom ter** e **Transmog** (integração opcional; degrada sem o KeystoneLoot).
+- A busca por **nível de chave** continua na caixa de nome **nativa** (única forma possível — a Blizzard protege esse campo contra addons).
+
+**English**
+
+- **Panel anchored to the native Group Finder:** KrononLFG now docks onto the game's Premade Groups finder with our look (navy/gold + logo), instead of just a separate window. **Drag** it anywhere — the position is remembered.
+- **Instant dungeon filter:** check/uncheck dungeons in the panel and the native list filters immediately (client-side, no re-search — no throttling or delisted entries).
+- **Per-dungeon drops at the key's ilvl:** each dungeon shows the items it drops; hover and the item appears **at the item level of the selected key** (real scaling; +11 and up use the +10 cap).
+- **Automatic class filter:** drops are already limited to your logged-in character's class.
+- **KeystoneLoot favorites highlight:** flagged items get a colored border — **BiS**, **Essential**, **Nice** and **Transmog** (optional integration; degrades without KeystoneLoot).
+- **Key-level search** stays in the **native** name box (the only possible way — Blizzard protects that field from addons).
+
+**Español**
+
+- **Panel anclado al Buscador nativo:** KrononLFG ahora se "pega" al buscador de Grupos Listos del juego con nuestro aspecto (navy/dorado + logo), en vez de solo una ventana aparte. **Arrástralo** a donde quieras — la posición se recuerda.
+- **Filtro de mazmorra instantáneo:** marca/desmarca mazmorras en el panel y la lista nativa filtra al momento (en el cliente, sin volver a buscar).
+- **Botín por mazmorra al ilvl de la llave:** cada mazmorra muestra los objetos que caen; pasa el ratón y el objeto aparece **al nivel de objeto de la llave seleccionada** (escala de verdad; +11 o más usan el tope del +10).
+- **Filtro automático por tu clase:** el botín ya viene solo de la clase del personaje conectado.
+- **Destacado de favoritos de KeystoneLoot:** los objetos marcados reciben un borde de color — **BiS**, **Esencial**, **Bueno** y **Transfig.** (integración opcional; funciona sin KeystoneLoot).
+- La búsqueda por **nivel de llave** sigue en el campo de nombre **nativo** (la única forma posible — Blizzard protege ese campo).
+
 ## 0.1.0
 
 **Português**

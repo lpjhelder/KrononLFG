@@ -76,8 +76,16 @@ end
 -- Carrega os drops de uma masmorra (estado global do EJ; tudo pcall).
 -- ---------------------------------------------------------------------------
 local function LoadDrops(cm)
+  -- 12.x: a API de LOOT do EJ migrou pra C_EncounterJournal (os globais
+  -- EJ_GetLootInfoByIndex/EJ_GetNumLoot foram REMOVIDOS). Resolvemos as funções
+  -- novas com fallback aos globais antigos, e garantimos o EJ carregado.
+  if C_AddOns and C_AddOns.LoadAddOn then pcall(C_AddOns.LoadAddOn, "Blizzard_EncounterJournal") end
+  local CEJ = C_EncounterJournal
+  local lootByIndex = (CEJ and CEJ.GetLootInfoByIndex) or EJ_GetLootInfoByIndex
+  local numLoot = (CEJ and CEJ.GetNumLoot) or EJ_GetNumLoot
+
   local ej = ResolveEJ(cm)
-  if not ej or not (EJ_SelectInstance and EJ_GetLootInfoByIndex) then
+  if not ej or not (EJ_SelectInstance and lootByIndex) then
     cache[cm] = { items = {}, ready = false, noData = true }
     return cache[cm]
   end
@@ -93,12 +101,21 @@ local function LoadDrops(cm)
 
   local okSel = pcall(EJ_SelectInstance, ej)
   if EJ_SetDifficulty then pcall(EJ_SetDifficulty, 23) end -- Mítico de masmorra
-  -- sem filtro de classe/spec: queremos TODOS os drops
-  if EJ_ResetLootFilter then pcall(EJ_ResetLootFilter) end
+  -- filtra os drops pra CLASSE do jogador (igual o KeystoneLoot puxa a classe
+  -- atual automaticamente). specID 0 = todas as specs da classe. Sem classID
+  -- válido, mostra todos (ResetLootFilter).
+  local classID
+  if UnitClass then local _, _, cid = UnitClass("player"); classID = cid end
+  local setFilter = (C_EncounterJournal and C_EncounterJournal.SetLootFilter) or EJ_SetLootFilter
+  if setFilter and type(classID) == "number" and classID > 0 then
+    pcall(setFilter, classID, 0)
+  elseif EJ_ResetLootFilter then
+    pcall(EJ_ResetLootFilter)
+  end
 
   local n = 0
-  if EJ_GetNumLoot then
-    local okC, c = pcall(EJ_GetNumLoot)
+  if numLoot then
+    local okC, c = pcall(numLoot)
     if okC and type(c) == "number" then n = c end
   end
   if n <= 0 then n = 250 end -- fallback: itera até dar nil
@@ -107,7 +124,7 @@ local function LoadDrops(cm)
   if okSel then
     local i = 1
     while i <= n do
-      local ok, info = pcall(EJ_GetLootInfoByIndex, i)
+      local ok, info = pcall(lootByIndex, i)
       if not ok or type(info) ~= "table" or not (info.itemID or info.link or info.name) then break end
       items[#items + 1] = {
         itemID = info.itemID, name = info.name, icon = info.icon,
@@ -145,6 +162,26 @@ end
 
 function Loot.Invalidate(cm)
   if cm then cache[cm] = nil; tries[cm] = nil else cache = {}; tries = {} end
+end
+
+-- DEBUG: por que os drops não aparecem? Mostra, por masmorra, se o EJ resolveu
+-- (journalInstanceID), se está pronto, e quantos itens. Use: /klfg drops
+function Loot.Debug()
+  local P = "|cffd9ad5a[KrononLFG drops]|r "
+  local CEJ = C_EncounterJournal
+  print(P .. "SelectInstance=" .. tostring(EJ_SelectInstance ~= nil)
+    .. " | C_EncJournal.GetLootInfoByIndex=" .. tostring(CEJ and CEJ.GetLootInfoByIndex ~= nil)
+    .. " GetNumLoot=" .. tostring(CEJ and CEJ.GetNumLoot ~= nil))
+  for _, d in ipairs(KLFG.DUNGEON_DATA or {}) do
+    local cm = d.cm
+    local name = KLFG.DungeonName and KLFG.DungeonName(cm) or "?"
+    local ej = ResolveEJ(cm)
+    local data = Loot.GetDrops(cm)
+    local n = (data and data.items) and #data.items or 0
+    print(string.format("%scm=%d [%s] EJ=%s ready=%s noData=%s items=%d",
+      P, cm, tostring(name), tostring(ej), tostring(data and data.ready),
+      tostring(data and data.noData), n))
+  end
 end
 
 -- Recompensa por nível de chave (ilvl + tier de fim de run / cofre / brasão).

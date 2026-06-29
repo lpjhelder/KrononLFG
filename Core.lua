@@ -50,6 +50,7 @@ local EN = {
   DUNGEONS_MODE_MANUAL  = "Manual",
   DUNGEONS_MODE_AUTO    = "Auto (KrononAlts)",
   DUNGEONS_AUTO_HINT    = "Picks the dungeons with the best loot for your current character.",
+  ANCHOR_KEY_HINT       = "Type the key level (e.g. +8) in the finder's Name box to filter by key.",
 
   ROLE_TANK             = "Tank",
   ROLE_HEALER           = "Healer",
@@ -63,6 +64,12 @@ local EN = {
   RESULT_LEADER         = "Leader",
   RESULT_LEADER_RATING  = "Rating",
   RESULT_AGE_FMT        = "Listed %s ago",
+  RESULT_KEY_FMT        = "Mythic +%d",
+  RESULT_KEY_UNKNOWN    = "Mythic +?  (level not shown in title)",
+  RESULT_NO_TITLE       = "(group set no title)",
+  RESULT_REQ_IO_FMT     = "Requires %d io",
+  KEY_EXACT             = "Only the selected key",
+  KEY_EXACT_HINT        = "Hides groups that wrote a different level in the title.",
   RESULT_SLOTS_NEED     = "Needs",
   RESULT_FULL           = "Full",
   RESULT_DELISTED       = "Delisted",
@@ -145,6 +152,7 @@ local PT = {
   DUNGEONS_MODE_MANUAL  = "Manual",
   DUNGEONS_MODE_AUTO    = "Auto (KrononAlts)",
   DUNGEONS_AUTO_HINT    = "Escolhe as masmorras com o melhor loot pro seu personagem atual.",
+  ANCHOR_KEY_HINT       = "Digite o nível da chave (ex.: +8) no campo de Nome do finder pra filtrar por chave.",
 
   ROLE_TANK             = "Tanque",
   ROLE_HEALER           = "Curador",
@@ -158,6 +166,12 @@ local PT = {
   RESULT_LEADER         = "Líder",
   RESULT_LEADER_RATING  = "Rating",
   RESULT_AGE_FMT        = "Criado há %s",
+  RESULT_KEY_FMT        = "Mítica +%d",
+  RESULT_KEY_UNKNOWN    = "Mítica +?  (nível não informado no título)",
+  RESULT_NO_TITLE       = "(grupo sem título)",
+  RESULT_REQ_IO_FMT     = "Requer %d io",
+  KEY_EXACT             = "Somente a chave selecionada",
+  KEY_EXACT_HINT        = "Esconde grupos que escreveram outro nível no título.",
   RESULT_SLOTS_NEED     = "Precisa de",
   RESULT_FULL           = "Cheio",
   RESULT_DELISTED       = "Removido",
@@ -240,6 +254,7 @@ local ES = {
   DUNGEONS_MODE_MANUAL  = "Manual",
   DUNGEONS_MODE_AUTO    = "Auto (KrononAlts)",
   DUNGEONS_AUTO_HINT    = "Elige las mazmorras con el mejor botín para tu personaje actual.",
+  ANCHOR_KEY_HINT       = "Escribe el nivel de llave (ej.: +8) en el campo de Nombre del buscador para filtrar por llave.",
 
   ROLE_TANK             = "Tanque",
   ROLE_HEALER           = "Sanador",
@@ -253,6 +268,12 @@ local ES = {
   RESULT_LEADER         = "Líder",
   RESULT_LEADER_RATING  = "Puntuación",
   RESULT_AGE_FMT        = "Creado hace %s",
+  RESULT_KEY_FMT        = "Mítica +%d",
+  RESULT_KEY_UNKNOWN    = "Mítica +?  (nivel no indicado en el título)",
+  RESULT_NO_TITLE       = "(grupo sin título)",
+  RESULT_REQ_IO_FMT     = "Requiere %d io",
+  KEY_EXACT             = "Solo la llave seleccionada",
+  KEY_EXACT_HINT        = "Oculta grupos que escribieron otro nivel en el título.",
   RESULT_SLOTS_NEED     = "Necesita",
   RESULT_FULL           = "Lleno",
   RESULT_DELISTED       = "Retirado",
@@ -545,6 +566,7 @@ local function InitDB()
   if db.dungeonMode ~= "manual" and db.dungeonMode ~= "auto" then db.dungeonMode = "manual" end
   if type(db.role) ~= "table" then db.role = { tank = false, healer = false, damager = true } end
   if type(db.keyLevel) ~= "number" then db.keyLevel = 2 end
+  if db.keyExact == nil then db.keyExact = false end
   if db.crossFaction == nil then db.crossFaction = true end
   if db.autoAccept == nil then db.autoAccept = false end
   if type(db.league) ~= "string" then db.league = "champion" end
@@ -563,6 +585,16 @@ function KLFG.SetKeyLevel(v)
   if v < 2 then v = 2 end
   if v > 30 then v = 30 end
   if DB then DB.keyLevel = v end
+  KLFG.bus:Fire("config")
+end
+
+-- Filtro "só a chave selecionada": como a API NÃO filtra grupos por nível de
+-- chave (só por masmorra), isto age na LEITURA — esconde grupos cujo nível
+-- (lido do título) é diferente do selecionado. Grupos sem nível no título são
+-- mantidos (não dá pra saber). Default off pra não esvaziar a lista.
+function KLFG.GetKeyExact() return (DB and DB.keyExact) == true end
+function KLFG.SetKeyExact(b)
+  if DB then DB.keyExact = (b == true) end
   KLFG.bus:Fire("config")
 end
 
@@ -724,6 +756,18 @@ SlashCmdList["KRONONLFG"] = function(msg)
     return
   elseif msg == "help" or msg == "ajuda" or msg == "ayuda" then
     print(KLFG_PREFIX .. L.SLASH_HINT)
+    return
+  elseif msg == "debug" then
+    if KLFG.DebugDump then KLFG.DebugDump() else print(KLFG_PREFIX .. "debug indisponível") end
+    return
+  elseif msg == "results" or msg == "res" then
+    if KLFG.DumpResults then KLFG.DumpResults() else print(KLFG_PREFIX .. "indisponível") end
+    return
+  elseif msg == "native" then
+    if KLFG.ProbeNative then KLFG.ProbeNative() else print(KLFG_PREFIX .. "indisponível") end
+    return
+  elseif msg == "drops" then
+    if KLFG.Loot and KLFG.Loot.Debug then KLFG.Loot.Debug() else print(KLFG_PREFIX .. "indisponível") end
     return
   end
   if KLFG.Toggle then KLFG.Toggle() end

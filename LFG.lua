@@ -108,6 +108,41 @@ end
 KLFG.EnsureCategory = EnsureCategory
 
 -- ---------------------------------------------------------------------------
+-- Busca NATIVA por nível de chave: escreve "+N" na SearchBox nativa e dispara
+-- o DoSearch nativo. O SERVIDOR aplica o filtro de chave (±1) e o resultado já
+-- vem filtrado em GetSearchResults (que lemos no evento). É o ÚNICO jeito de
+-- filtrar por chave (o nível é ilegível pro addon; só o servidor filtra).
+-- Tudo defensivo: se a UI nativa não existir/mudar de nome, retorna false e o
+-- KLFG.Search cai no fallback (busca direta, sem filtro de chave).
+-- Roda dentro do clique do Procurar (hardware event) → DoSearch é permitido.
+-- ---------------------------------------------------------------------------
+local function TryNativeKeySearch(keyText, filter)
+  if type(keyText) ~= "string" or keyText == "" then return false end
+  local load = (C_AddOns and C_AddOns.LoadAddOn) or _G.LoadAddOn
+  if load then pcall(load, "Blizzard_GroupFinder") end
+  local lf = _G.LFGListFrame
+  local panel = lf and lf.SearchPanel
+  local box = panel and panel.SearchBox
+  if not (panel and box and box.SetText) then return false end
+  -- só dirige o nativo se o painel já está ABERTO/inicializado (frio não dispara)
+  if panel.IsShown and not panel:IsShown() then return false end
+  local cat = dungeonCat or 2
+  if _G.LFGListSearchPanel_SetCategory then
+    if not pcall(_G.LFGListSearchPanel_SetCategory, panel, cat, filter or 0, 0) then
+      panel.categoryID = cat
+    end
+  else
+    panel.categoryID = cat
+  end
+  box:SetText(keyText)
+  if _G.LFGListSearchPanel_DoSearch then
+    return (pcall(_G.LFGListSearchPanel_DoSearch, panel)) == true
+  end
+  return false
+end
+KLFG.TryNativeKeySearch = TryNativeKeySearch
+
+-- ---------------------------------------------------------------------------
 -- Busca (disparada por clique). Tratada como hardware event — NUNCA chamar de
 -- timer/OnUpdate. Buscamos a categoria inteira (robusto) e filtramos por
 -- masmorra/elegibilidade na LEITURA, que é livre.
@@ -130,7 +165,9 @@ function KLFG.Search()
     filter = Enum.LFGListFilter.CurrentSeason
   end
 
-  -- tenta a assinatura moderna (categoria + filtro); cai pra mínima se rejeitar
+  -- BUSCA DIRETA (confiável). A busca nativa por chave está em pesquisa e fica
+  -- FORA do Procurar até o mecanismo exato estar provado in-game, pra NUNCA mais
+  -- arriscar o Procurar. (TryNativeKeySearch fica definida mas desplugada.)
   local ok = pcall(C_LFGList.Search, dungeonCat, filter)
   if not ok then ok = pcall(C_LFGList.Search, dungeonCat) end
   if not ok then
@@ -175,6 +212,172 @@ local function ResultCM(info)
 end
 KLFG.ResultCM = ResultCM
 
+-- Nível da chave (+N) do grupo. ⚠️ NÃO existe campo direto na API: o líder
+-- digita no NOME (e às vezes no comentário, que vem censurado no 12.1). Lemos
+-- ambos e tentamos os padrões mais comuns ("+8", "8+", "key 8", "chave 8",
+-- "8 spam"). Cap 2-40 evita casar rating (io 2500) ou ruído. nil = desconhecido.
+local function ResultKeyLevel(info)
+  if type(info) ~= "table" then return nil end
+  local hay = ((info.name or "") .. "  " .. (info.comment or "")):lower()
+  local lvl = hay:match("%+%s*(%d%d?)")        -- "+8", "+ 8", "m+8"
+           or hay:match("(%d%d?)%s*%+")        -- "8+"
+           or hay:match("key%s*(%d%d?)")       -- "key 8"
+           or hay:match("chave%s*(%d%d?)")     -- "chave 8"
+           or hay:match("llave%s*(%d%d?)")     -- "llave 8"
+           or hay:match("lvl%s*(%d%d?)")       -- "lvl 8"
+           or hay:match("level%s*(%d%d?)")     -- "level 8"
+           or hay:match("nivel%s*(%d%d?)")     -- "nivel 8"
+           or hay:match("^%s*(%d%d?)[%s%+]")   -- "8 spam" (nº no início)
+  lvl = tonumber(lvl)
+  if lvl and lvl >= 2 and lvl <= 40 then return lvl end
+  return nil
+end
+KLFG.ResultKeyLevel = ResultKeyLevel
+
+-- DUMP dos resultados ATUAIS (o que o addon lê de C_LFGList.GetSearchResults).
+-- Use APÓS uma busca NATIVA "+8": se a contagem e os títulos vierem só 7/8/9,
+-- o filtro nativo "vaza" pro addon → dá pra dirigir a caixa nativa e filtrar.
+-- (info.name é token |K, mas o CHAT renderiza o título real ao imprimir.)
+-- PROBE do frame nativo: o que existe e está inicializado, pra dirigir a busca
+-- nativa corretamente (provavelmente precisa ABRIR o finder p/ inicializar o painel).
+function KLFG.ProbeNative()
+  local P = "|cffd9ad5a[KrononLFG]|r "
+  local lf = _G.LFGListFrame
+  print(P .. "LFGListFrame=" .. tostring(lf ~= nil) .. (lf and ("  shown=" .. tostring(lf:IsShown())) or ""))
+  if lf and lf.SearchPanel then
+    local panel = lf.SearchPanel
+    print("  SearchPanel: categoryID=" .. tostring(panel.categoryID)
+      .. "  filters=" .. tostring(panel.filters)
+      .. "  SearchBox=" .. tostring(panel.SearchBox ~= nil)
+      .. "  panelShown=" .. tostring(panel:IsShown()))
+  else
+    print("  SearchPanel=nil")
+  end
+  print("  fn: DoSearch=" .. tostring(_G.LFGListSearchPanel_DoSearch ~= nil)
+    .. "  SetCategory=" .. tostring(_G.LFGListSearchPanel_SetCategory ~= nil)
+    .. "  PVEFrame=" .. tostring(_G.PVEFrame ~= nil)
+    .. "  GroupFinderFrame=" .. tostring(_G.GroupFinderFrame ~= nil))
+  if C_AddOns and C_AddOns.IsAddOnLoaded then
+    print("  loaded: GroupFinder=" .. tostring(C_AddOns.IsAddOnLoaded("Blizzard_GroupFinder"))
+      .. "  LFGUI=" .. tostring(C_AddOns.IsAddOnLoaded("Blizzard_LookingForGroupUI")))
+  end
+end
+
+function KLFG.DumpResults()
+  local P = "|cffd9ad5a[KrononLFG]|r "
+  if not (C_LFGList and C_LFGList.GetSearchResults) then print(P .. "sem C_LFGList"); return end
+  local ok, _, results = pcall(C_LFGList.GetSearchResults)
+  if not ok or type(results) ~= "table" then print(P .. "sem resultados — busque antes"); return end
+  print(P .. "GetSearchResults = " .. #results .. " grupos. Títulos:")
+  for i = 1, math.min(#results, 15) do
+    local info = ReadResultInfo(results[i])
+    if info then
+      print("  " .. i .. ": " .. tostring(info.name) .. "   (CM=" .. tostring(ResultCM(info)) .. ")")
+    end
+  end
+end
+
+-- DEBUG: dump dos campos crus dos resultados (pra achar onde está o nível da
+-- chave). Use APÓS uma busca: /klfg debug. Mostra name/comment + TODAS as chaves
+-- de info de cada grupo, pra revelar campo estruturado de keystone, se existir.
+function KLFG.DebugDump()
+  local P = "|cffd9ad5a[KrononLFG]|r "
+  if not (C_LFGList and C_LFGList.GetSearchResults) then print(P .. "sem C_LFGList"); return end
+  local ok, total, results = pcall(C_LFGList.GetSearchResults)
+  if not ok or type(results) ~= "table" then print(P .. "sem resultados — faça uma busca antes"); return end
+  print(P .. "total de resultados: " .. tostring(#results))
+  print(P .. "self-test '+12 Competitive' => " .. tostring(ResultKeyLevel({ name = "+12 Competitive" })))
+  -- PROBE da busca por RANGE de chave: texto -> activities (mecanismo nativo).
+  -- READ-only (GetAvailableActivities/GetActivityInfoTable são livres). Revela o
+  -- que "+8"/"8"/"8-8" devolvem, pra eu ligar SetSearchToActivity+Search certo.
+  if C_LFGList.GetAvailableActivities then
+    if KLFG.EnsureCategory then pcall(KLFG.EnsureCategory) end
+    local cat = dungeonCat or 2
+    print(P .. "PROBE busca-por-chave (cat=" .. tostring(cat) .. ")")
+    for _, txt in ipairs({ "+8", "8", "8-8" }) do
+      local ok2, acts = pcall(C_LFGList.GetAvailableActivities, cat, nil, 0, txt)
+      if ok2 and type(acts) == "table" then
+        print("  GAA('" .. txt .. "') -> " .. #acts .. " activities")
+        for i = 1, math.min(#acts, 5) do
+          local aid = acts[i]
+          local nm = "?"
+          if C_LFGList.GetActivityInfoTable then
+            local okT, at = pcall(C_LFGList.GetActivityInfoTable, aid)
+            if okT and type(at) == "table" then nm = tostring(at.fullName or at.shortName or "?") end
+          end
+          print("     " .. tostring(aid) .. " = " .. nm)
+        end
+      else
+        print("  GAA('" .. txt .. "') = nil/erro")
+      end
+    end
+  end
+  local shown = 0
+  for _, id in ipairs(results) do
+    local info = ReadResultInfo(id)
+    if info then
+      shown = shown + 1
+      print(string.format("%s--- #%d ---", P, shown))
+      print("name = [" .. tostring(info.name) .. "]")
+      do
+        local nmS = tostring(info.name or "")
+        local bts = {}
+        for bi = 1, math.min(#nmS, 22) do bts[bi] = string.byte(nmS, bi) end
+        print("name bytes(" .. #nmS .. "): " .. table.concat(bts, " "))
+        print("match direto +N = " .. tostring(nmS:lower():match("%+%s*(%d%d?)")))
+      end
+      print("comment = [" .. tostring(info.comment) .. "]")
+      print("activityID=" .. tostring(info.activityID)
+        .. (type(info.activityIDs) == "table" and ("  activityIDs=" .. table.concat(info.activityIDs, ",")) or ""))
+      print("CM=" .. tostring(ResultCM(info)) .. "  parsed+X=" .. tostring(ResultKeyLevel(info))
+        .. "  reqScore=" .. tostring(info.requiredDungeonScore))
+      -- ACTIVITY: a M+ pode ter activity por NÍVEL de chave? dump dos campos
+      if C_LFGList.GetActivityInfoTable then
+        local acts = {}
+        if type(info.activityIDs) == "table" then
+          for _, a in ipairs(info.activityIDs) do acts[#acts + 1] = a end
+        elseif info.activityID then acts[1] = info.activityID end
+        for _, aid in ipairs(acts) do
+          local ok2, at = pcall(C_LFGList.GetActivityInfoTable, aid)
+          if ok2 and type(at) == "table" then
+            local ak = {}
+            for k, val in pairs(at) do if type(val) ~= "table" then ak[#ak + 1] = k .. "=" .. tostring(val) end end
+            table.sort(ak)
+            print("  activity " .. aid .. ": " .. table.concat(ak, "  "))
+          end
+        end
+      end
+      local keys = {}
+      for k, val in pairs(info) do
+        if type(val) ~= "table" then keys[#keys + 1] = k .. "=" .. tostring(val) end
+      end
+      table.sort(keys)
+      print("ALL: " .. table.concat(keys, "  "))
+      -- só no 1º grupo: dump por MEMBRO (pra ver se o ilvl deles é acessível)
+      if shown == 1 and C_LFGList.GetSearchResultMemberInfo then
+        local nm = info.numMembers or 0
+        if nm < 1 then nm = 5 end
+        for mi = 1, math.min(nm, 6) do
+          local r = { pcall(C_LFGList.GetSearchResultMemberInfo, id, mi) }
+          if r[1] and r[2] ~= nil then
+            if type(r[2]) == "table" then
+              local mk = {}
+              for k, val in pairs(r[2]) do if type(val) ~= "table" then mk[#mk + 1] = k .. "=" .. tostring(val) end end
+              table.sort(mk)
+              print("  membro " .. mi .. ": " .. table.concat(mk, "  "))
+            else
+              local parts = {}
+              for j = 2, #r do parts[#parts + 1] = tostring(r[j]) end
+              print("  membro " .. mi .. ": " .. table.concat(parts, " | "))
+            end
+          end
+        end
+      end
+    end
+    if shown >= 3 then break end
+  end
+end
+
 -- O grupo precisa do MEU papel? (counts.TANK/HEALER/DAMAGER são membros já no grupo;
 -- comp padrão 1/1/3). counts nil = desconhecido → não descarta.
 local function GroupNeedsMyRole(counts, role)
@@ -215,9 +418,12 @@ local function ScoreResult(info, counts, role, prefBonus)
   local score = 1000
   local num = info.numMembers or 0
   local maxP = info.maxNumPlayers or 5
-  if maxP > 0 then score = score + (num / maxP) * 300 end -- perto de encher = melhor fit
+  if maxP > 0 then score = score + (num / maxP) * 340 end -- perto de encher = melhor fit (dominante)
   local lr = info.leaderOverallDungeonScore or 0
-  score = score + math.min(lr / 10, 350) -- rating do líder
+  -- rating do líder: PESO BAIXO de propósito. Rating alta = provável chave alta;
+  -- não dá pra ler o nível, então não favorecemos +20 jogando líder forte pro topo.
+  -- Fica só como leve desempate de qualidade.
+  score = score + math.min(lr / 40, 90)
   local age = info.age or 0
   score = score - (age / 60) -- penaliza listagens velhas (grupo provavelmente travado)
   score = score + (prefBonus or 0) -- masmorra recomendada/mais desejada
@@ -233,6 +439,7 @@ local function RebuildQueue()
   if not ok or type(results) ~= "table" then KLFG.bus:Fire("results"); return end
 
   local role = KLFG.GetRole()
+  local wantKey = KLFG.GetKeyLevel()       -- chave selecionada (pref. de ranqueamento)
   local selSet, selOrder = {}, {}
   do
     local sel = KLFG.GetSelectedDungeons()
@@ -247,13 +454,21 @@ local function RebuildQueue()
     local info = ReadResultInfo(id)
     if info and not info.isDelisted and not info.hasSelf then
       local cm = ResultCM(info)
+      -- ⚠️ 12.x: o título (name) vem como token protegido |K...|k — o addon NÃO lê
+      -- o nível. ResultKeyLevel quase sempre dá nil; serve só pra listagens antigas
+      -- legíveis. O nível é EXIBIDO (não filtrado) via info.name cru na UI.
+      local rkey = ResultKeyLevel(info)
       -- com cm mapeado: exige estar na seleção. Sem mapeamento: aceita (degrada).
       local pass = (cm == nil) or (selSet[cm] == true)
       if pass and Eligible(info) then
         local counts = MemberCounts(id)
-        local score = ScoreResult(info, counts, role, cm and selOrder[cm] or 0)
+        -- bônus de chave: igual à selecionada sobe MUITO; ±1 sobe um pouco
+        local keyBonus = 0
+        if rkey == wantKey then keyBonus = 280
+        elseif rkey and math.abs(rkey - wantKey) == 1 then keyBonus = 70 end
+        local score = ScoreResult(info, counts, role, (cm and selOrder[cm] or 0) + keyBonus)
         if score then
-          rankedQueue[#rankedQueue + 1] = { id = id, info = info, counts = counts, cm = cm, score = score }
+          rankedQueue[#rankedQueue + 1] = { id = id, info = info, counts = counts, cm = cm, key = rkey, score = score }
         end
       end
     end

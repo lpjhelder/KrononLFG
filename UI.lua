@@ -40,7 +40,7 @@ local function RoleColor(which)
   return ROLE_DPS
 end
 
-local FRAME_W, FRAME_H = 720, 486
+local FRAME_W, FRAME_H = 720, 560
 local BOTTOM_H = 46
 
 -- design system: reusa KA.STYLE se o KrononAlts estiver presente, senão cópia local
@@ -463,16 +463,16 @@ BuildLeaguesView = function()
   views.leagues = v
 
   local header = Titlize(MakeFS(v, "GameFontNormalLarge", L.TAB_LEAGUES, ACCENT))
-  header:SetPoint("TOP", v, "TOP", 0, -6)
+  header:SetPoint("TOP", v, "TOP", 0, -12)
 
   v.cards = {}
   local n = #KLFG.LEAGUES
-  local cardW, cardH, gap = 210, 320, 16
+  local cardW, cardH, gap = 210, 312, 16
   local totalW = n * cardW + (n - 1) * gap
   for i, lg in ipairs(KLFG.LEAGUES) do
     local card = CreateFrame("Button", nil, v, "BackdropTemplate")
     card:SetSize(cardW, cardH)
-    card:SetPoint("TOP", v, "TOP", -totalW / 2 + cardW / 2 + (i - 1) * (cardW + gap), -34)
+    card:SetPoint("TOP", v, "TOP", -totalW / 2 + cardW / 2 + (i - 1) * (cardW + gap), -48)
     if card.SetBackdrop then
       pcall(card.SetBackdrop, card, { bgFile = WHITE8, edgeFile = WHITE8, edgeSize = 2 })
       pcall(card.SetBackdropColor, card, PANEL[1], PANEL[2], PANEL[3], 1)
@@ -572,8 +572,9 @@ RenderLeagues = function()
     card.desc:SetText(L[lg.descKey])
     local lo, hi = KLFG.LeagueIlvlRange(lg)
     card.range:SetText(string.format(L.LEAGUE_RANGE_FMT, lo, hi, lg.keyLo, lg.keyHi))
-    -- brasão DERIVADO do nível de chave representativo (NÃO um tier fixo por liga)
-    local rw = KLFG.RewardForKey(KLFG.LeagueRepKey(lg))
+    -- brasão da CHAVE DE ENTRADA da liga (keyLo): o card mostra o brasão da
+    -- própria trilha (Campeão→Campeão), não o do topo da faixa (+5 já dá Herói)
+    local rw = KLFG.RewardForKey(lg.keyLo)
     if rw then
       card.crest:SetText(string.format(L.PREVIEW_CREST_FMT, rw.crest, KLFG.TierName(rw.crestT))
         .. "  " .. L.PREVIEW_CREST_DOUBT)
@@ -743,7 +744,7 @@ BuildResultsView = function()
   v.dungeon = Titlize(MakeFS(card, "GameFontNormalHuge", "", ACCENT))
   v.dungeon:SetPoint("TOPLEFT", card, "TOPLEFT", 18, -16)
 
-  v.keyline = MakeFS(card, "GameFontNormal", "", { 0.9, 0.9, 0.95 })
+  v.keyline = MakeFS(card, "GameFontNormalLarge", "", ACCENT)
   v.keyline:SetPoint("TOPLEFT", v.dungeon, "BOTTOMLEFT", 0, -6)
 
   -- composição do grupo: slots de papel (preenchido vs vaga aberta), não texto "3/5"
@@ -842,21 +843,28 @@ RenderResults = function()
   local role = KLFG.GetRole()
   v.dungeon:SetText(e.cm and KLFG.DungeonName(e.cm) or (info.name or "?"))
 
-  -- nível de chave: tenta extrair "+N" do comentário; senão mostra o requisito de rating
-  local lvl = info.comment and tostring(info.comment):match("%+?(%d%d?)")
-  local keyTxt = ""
-  if lvl then keyTxt = "+" .. lvl end
-  if info.requiredDungeonScore and info.requiredDungeonScore > 0 then
-    keyTxt = keyTxt .. (keyTxt ~= "" and "   " or "") .. "io " .. info.requiredDungeonScore
+  -- TÍTULO DO LÍDER (com o nível que ele anunciou). ⚠️ 12.x: info.name vem como
+  -- token protegido |K...|k — o ADDON não lê, mas o CLIENTE renderiza o texto real
+  -- ("+12 Competitive") quando jogado num FontString. Então exibimos cru.
+  local title = info.name
+  if type(title) == "string" and title ~= "" then
+    v.keyline:SetText(title)
+    v.keyline:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
+  else
+    v.keyline:SetText(L.RESULT_NO_TITLE)
+    v.keyline:SetTextColor(0.68, 0.68, 0.74)
   end
-  v.keyline:SetText(keyTxt)
 
   v.compLabel:SetText(L.RESULT_SLOTS_NEED)
   RenderResultSlots(v, e.counts, role)
 
   local lname = info.leaderName or "?"
   local lscore = info.leaderOverallDungeonScore or 0
-  v.leader:SetText(string.format("%s: %s    %s: %d", L.RESULT_LEADER, lname, L.RESULT_LEADER_RATING, lscore))
+  local lstr = string.format("%s: %s    %s: %d", L.RESULT_LEADER, lname, L.RESULT_LEADER_RATING, lscore)
+  if info.requiredDungeonScore and info.requiredDungeonScore > 0 then
+    lstr = lstr .. "    " .. string.format(L.RESULT_REQ_IO_FMT, info.requiredDungeonScore)
+  end
+  v.leader:SetText(lstr)
 
   v.age:SetText(string.format(L.RESULT_AGE_FMT, FormatAge(info.age)))
 
@@ -900,7 +908,7 @@ BuildConfigView = function()
   v.dchecks = {}
   for i, d in ipairs(KLFG.DUNGEON_DATA) do
     local c = MakeCheck(v, "")
-    c:SetPoint("TOPLEFT", v, "TOPLEFT", 14, -64 - (i - 1) * 26)
+    c:SetPoint("TOPLEFT", v, "TOPLEFT", 14, -90 - (i - 1) * 26)
     c:SetScript("OnClick", function() KLFG.ToggleDungeon(d.cm); RenderConfig() end)
     c.cm = d.cm
     v.dchecks[i] = c
