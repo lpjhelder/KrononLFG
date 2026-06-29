@@ -1,0 +1,17 @@
+## Interface: 120007
+## Title: KrononLFG
+## Notes: Ready-group finder for Mythic+ — pick dungeons, search, and the addon ranks the best groups so you apply with a single click (drop preview included).
+## Notes-ptBR: Buscador de grupos prontos de Mítica+ — escolha masmorras, procure, e o addon ranqueia os melhores grupos pra você se inscrever com um clique (com prévia de drops).
+## Notes-esES: Buscador de grupos listos de Mítica+ — elige mazmorras, busca, y el addon clasifica los mejores grupos para inscribirte con un clic (con vista previa de botín).
+## Author: Kronon
+## Category: Kronon
+## Version: 0.1.0
+## SavedVariables: KrononLFGDB
+## OptionalDeps: KrononAlts, KrononBags, KrononLib, KeystoneLoot
+## IconTexture: Interface\AddOns\KrononLFG\Media\KrononLogo.tga
+# X-Curse-Project-ID: 0000000  (placeholder — o dono cria o projeto no CurseForge e descomenta com o ID real)
+
+Core.lua
+LFG.lua
+Loot.lua
+UI.lua

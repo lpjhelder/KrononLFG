@@ -1,0 +1,14 @@
+package-as: KrononLFG
+
+enable-nolib-creation: no
+
+# O changelog do CurseForge vem deste arquivo (markdown), não da mensagem de commit.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - README.md
+  - .github
+  - "*.zip"
+  - "*.md.bak"
