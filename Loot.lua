@@ -164,26 +164,6 @@ function Loot.Invalidate(cm)
   if cm then cache[cm] = nil; tries[cm] = nil else cache = {}; tries = {} end
 end
 
--- DEBUG: por que os drops não aparecem? Mostra, por masmorra, se o EJ resolveu
--- (journalInstanceID), se está pronto, e quantos itens. Use: /klfg drops
-function Loot.Debug()
-  local P = "|cffd9ad5a[KrononLFG drops]|r "
-  local CEJ = C_EncounterJournal
-  print(P .. "SelectInstance=" .. tostring(EJ_SelectInstance ~= nil)
-    .. " | C_EncJournal.GetLootInfoByIndex=" .. tostring(CEJ and CEJ.GetLootInfoByIndex ~= nil)
-    .. " GetNumLoot=" .. tostring(CEJ and CEJ.GetNumLoot ~= nil))
-  for _, d in ipairs(KLFG.DUNGEON_DATA or {}) do
-    local cm = d.cm
-    local name = KLFG.DungeonName and KLFG.DungeonName(cm) or "?"
-    local ej = ResolveEJ(cm)
-    local data = Loot.GetDrops(cm)
-    local n = (data and data.items) and #data.items or 0
-    print(string.format("%scm=%d [%s] EJ=%s ready=%s noData=%s items=%d",
-      P, cm, tostring(name), tostring(ej), tostring(data and data.ready),
-      tostring(data and data.noData), n))
-  end
-end
-
 -- Recompensa por nível de chave (ilvl + tier de fim de run / cofre / brasão).
 -- Os nomes de tier já vêm localizados. crest fica com selo "a confirmar" na UI.
 function Loot.RewardInfo(keyLevel)

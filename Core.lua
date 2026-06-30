@@ -757,18 +757,6 @@ SlashCmdList["KRONONLFG"] = function(msg)
   elseif msg == "help" or msg == "ajuda" or msg == "ayuda" then
     print(KLFG_PREFIX .. L.SLASH_HINT)
     return
-  elseif msg == "debug" then
-    if KLFG.DebugDump then KLFG.DebugDump() else print(KLFG_PREFIX .. "debug indisponível") end
-    return
-  elseif msg == "results" or msg == "res" then
-    if KLFG.DumpResults then KLFG.DumpResults() else print(KLFG_PREFIX .. "indisponível") end
-    return
-  elseif msg == "native" then
-    if KLFG.ProbeNative then KLFG.ProbeNative() else print(KLFG_PREFIX .. "indisponível") end
-    return
-  elseif msg == "drops" then
-    if KLFG.Loot and KLFG.Loot.Debug then KLFG.Loot.Debug() else print(KLFG_PREFIX .. "indisponível") end
-    return
   end
   if KLFG.Toggle then KLFG.Toggle() end
 end
