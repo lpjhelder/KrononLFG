@@ -169,6 +169,27 @@ local function ItemTier(cm, itemId)
   return nil
 end
 
+-- Pontua uma masmorra pelos favoritos do KeystoneLoot (spec atual), p/ ordenar a
+-- lista por PRIORIDADE: nº de BiS (tier 3) pesa mais; total de favoritos desempata.
+-- Sem KeystoneLoot/spec/favoritos → 0,0 (cai na ordem original). Retorna bis, total.
+local function DungeonFavScore(cm)
+  local db = rawget(_G, "KeystoneLootDB")
+  if type(db) ~= "table" or type(db.favorites) ~= "table" then return 0, 0 end
+  local key, spec = KLCharacterKey(), CurrentSpecId()
+  if not (key and spec) then return 0, 0 end
+  local favs = db.favorites[key]; if type(favs) ~= "table" then return 0, 0 end
+  local sm = favs[cm]; if type(sm) ~= "table" then return 0, 0 end
+  local spm = sm[spec]; if type(spm) ~= "table" then return 0, 0 end
+  local bis, total = 0, 0
+  for _, info in pairs(spm) do
+    if type(info) == "table" and type(info.tier) == "number" then
+      total = total + 1
+      if info.tier == 3 then bis = bis + 1 end
+    end
+  end
+  return bis, total
+end
+
 local TIER_COLOR = {
   [3] = { 1.00, 0.84, 0.00 }, -- BiS (dourado)
   [2] = { 1.00, 0.45, 0.10 }, -- Essencial (laranja)
@@ -321,6 +342,24 @@ local function BuildPanel()
   dl:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -176)
   dchecks = {}
   local data = KLFG.DUNGEON_DATA or {}
+  -- ORDENA por prioridade: masmorras com mais BiS/favoritos (KeystoneLoot, spec atual)
+  -- no topo, pra facilitar escolher o que marcar. Copia (NÃO muta DUNGEON_DATA);
+  -- desempate estável pela ordem original. Sem favoritos → ordem original.
+  do
+    local ranked = {}
+    for idx = 1, #data do
+      local bis, total = DungeonFavScore(data[idx].cm)
+      ranked[idx] = { d = data[idx], idx = idx, bis = bis, total = total }
+    end
+    table.sort(ranked, function(a, b)
+      if a.bis ~= b.bis then return a.bis > b.bis end
+      if a.total ~= b.total then return a.total > b.total end
+      return a.idx < b.idx
+    end)
+    local ordered = {}
+    for idx = 1, #ranked do ordered[idx] = ranked[idx].d end
+    data = ordered
+  end
   local ROW_H, ROW_W, ART_W = 32, 546, 200
   for i, d in ipairs(data) do
     local row = CreateFrame("Frame", nil, f)

@@ -1,5 +1,19 @@
 # KrononLFG — Changelog
 
+## 0.3.0
+
+**Português**
+
+- **Masmorras em ordem de prioridade:** no painel ancorado, a lista de masmorras agora vem ordenada pelos seus **favoritos do KeystoneLoot** da spec atual (mais **BiS** no topo), em vez de uma ordem fixa — fica mais fácil saber o que marcar. Reflete os favoritos no momento em que o painel abre; sem KeystoneLoot, mantém a ordem padrão.
+
+**English**
+
+- **Dungeons in priority order:** in the anchored panel, the dungeon list is now sorted by your current spec's **KeystoneLoot favorites** (most **BiS** on top) instead of a fixed order — easier to know what to check. Reflects favorites at the time the panel opens; without KeystoneLoot, keeps the default order.
+
+**Español**
+
+- **Mazmorras en orden de prioridad:** en el panel anclado, la lista de mazmorras ahora se ordena por los **favoritos de KeystoneLoot** de tu especialización actual (más **BiS** arriba) en vez de un orden fijo — más fácil saber qué marcar. Refleja los favoritos al abrir el panel; sin KeystoneLoot, mantiene el orden por defecto.
+
 ## 0.2.0
 
 **Português**
