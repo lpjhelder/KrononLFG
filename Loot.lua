@@ -26,7 +26,10 @@ local Loot = KLFG.Loot
 -- ---------------------------------------------------------------------------
 local cache = {}      -- [cm] = { items = {...}, ready = bool, noData = bool }
 local EJ_BY_CM = {}   -- [cm] = journalInstanceID (resolvido)
-local pendingCM       -- masmorra cujos dados estão carregando (async)
+-- SET de masmorras com dados carregando (async). Precisa ser um set — o painel
+-- ancorado dispara os 8 loads em sequência; com um slot único, só a ÚLTIMA
+-- masmorra era re-enumerada quando o loot chegava e as outras 7 ficavam vazias.
+local pending = {}    -- [cm] = true
 local tries = {}      -- [cm] = nº de re-enumerações (trava anti-loop)
 
 -- ---------------------------------------------------------------------------
@@ -90,7 +93,7 @@ local function LoadDrops(cm)
     return cache[cm]
   end
 
-  pendingCM = cm
+  pending[cm] = true
   -- salva TODO o estado global do EJ pra restaurar depois (não bagunçar o Journal aberto do usuário):
   -- tier + instância + dificuldade. Todos via getter defensivo (podem não existir no cliente).
   local prevTier = EJ_GetCurrentTier and EJ_GetCurrentTier() or nil
@@ -142,7 +145,7 @@ local function LoadDrops(cm)
 
   local ready = #items > 0
   cache[cm] = { items = items, ready = ready, noData = (not ready) and (not okSel) }
-  if ready then pendingCM = nil end
+  if ready then pending[cm] = nil end
   return cache[cm]
 end
 
@@ -157,11 +160,12 @@ function Loot.GetDrops(cm)
 end
 
 function Loot.IsLoading(cm)
-  return pendingCM == cm and not (cache[cm] and cache[cm].ready)
+  return pending[cm] ~= nil and not (cache[cm] and cache[cm].ready)
 end
 
 function Loot.Invalidate(cm)
-  if cm then cache[cm] = nil; tries[cm] = nil else cache = {}; tries = {} end
+  if cm then cache[cm] = nil; tries[cm] = nil; pending[cm] = nil
+  else cache = {}; tries = {}; pending = {} end
 end
 
 -- Recompensa por nível de chave (ilvl + tier de fim de run / cofre / brasão).
@@ -177,18 +181,25 @@ function Loot.RewardInfo(keyLevel)
 end
 
 -- ---------------------------------------------------------------------------
--- Loot assíncrono: re-enumera a masmorra pendente quando o EJ avisa que chegou.
--- (a grafia "RECIEVED" é a do próprio cliente). Trava anti-loop por tries.
+-- Loot assíncrono: re-enumera TODAS as masmorras pendentes quando o EJ avisa que
+-- chegou (a grafia "RECIEVED" é a do próprio cliente). Itera sobre uma CÓPIA do
+-- set (LoadDrops muta `pending`). Trava anti-loop por tries, por masmorra.
 -- ---------------------------------------------------------------------------
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("EJ_LOOT_DATA_RECIEVED")
 ev:SetScript("OnEvent", function()
-  local cm = pendingCM
-  if not cm then return end
-  tries[cm] = (tries[cm] or 0) + 1
-  if tries[cm] > 6 then pendingCM = nil; return end
-  cache[cm] = nil
-  local c = LoadDrops(cm)
-  KLFG.bus:Fire("loot", cm)
-  if c and c.ready then pendingCM = nil end
+  local list = {}
+  for cm in pairs(pending) do list[#list + 1] = cm end
+  if #list == 0 then return end
+  for _, cm in ipairs(list) do
+    tries[cm] = (tries[cm] or 0) + 1
+    if tries[cm] > 6 then
+      pending[cm] = nil
+    else
+      cache[cm] = nil
+      local c = LoadDrops(cm)
+      KLFG.bus:Fire("loot", cm)
+      if c and c.ready then pending[cm] = nil end
+    end
+  end
 end)

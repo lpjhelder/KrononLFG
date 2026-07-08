@@ -5,7 +5,7 @@
 ## Notes-esES: Buscador de grupos listos de Mítica+ — elige mazmorras, busca, y el addon clasifica los mejores grupos para inscribirte con un clic (con vista previa de botín).
 ## Author: Kronon
 ## Category: Kronon
-## Version: 0.3.0
+## Version: 0.3.1
 ## SavedVariables: KrononLFGDB
 ## OptionalDeps: KrononAlts, KrononBags, KrononLib, KeystoneLoot
 ## IconTexture: Interface\AddOns\KrononLFG\Media\KrononLogo.tga

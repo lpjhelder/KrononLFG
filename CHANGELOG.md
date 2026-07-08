@@ -1,5 +1,19 @@
 # KrononLFG — Changelog
 
+## 0.3.1
+
+**Português**
+
+- **Corrigido:** a **prévia de drops** agora carrega pra **todas** as masmorras do painel ancorado. Antes, o carregamento assíncrono do Diário só concluía pra última masmorra da lista — as outras ficavam com a tira de itens vazia até você interagir de novo.
+
+**English**
+
+- **Fixed:** the **drop preview** now loads for **all** dungeons in the anchored panel. Previously the Journal's async loading only completed for the last dungeon in the list — the others kept an empty item strip until you interacted again.
+
+**Español**
+
+- **Corregido:** la **vista previa de botín** ahora carga para **todas** las mazmorras del panel anclado. Antes, la carga asíncrona del Diario solo se completaba para la última mazmorra de la lista — las demás quedaban con la tira de objetos vacía hasta interactuar de nuevo.
+
 ## 0.3.0
 
 **Português**
